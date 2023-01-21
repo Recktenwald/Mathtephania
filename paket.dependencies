@@ -1,0 +1,7 @@
+source https://api.nuget.org/v3/index.json
+
+storage: none
+framework: net7.0
+nuget FParsec 1.1.1
+nuget Magick.NET-Q8-AnyCPU 12.2.2
+nuget FFMpegCore 4.8.0

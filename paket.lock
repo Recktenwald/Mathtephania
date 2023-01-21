@@ -1,0 +1,21 @@
+STORAGE: NONE
+RESTRICTION: == net7.0
+NUGET
+  remote: https://api.nuget.org/v3/index.json
+    FFMpegCore (4.8)
+      Instances (>= 2.0)
+      System.Drawing.Common (>= 5.0.2)
+      System.Text.Json (>= 6.0.2)
+    FParsec (1.1.1)
+      FSharp.Core (>= 4.3.4)
+    FSharp.Core (7.0)
+    Instances (2.0)
+    Magick.NET-Q8-AnyCPU (12.2.2)
+      Magick.NET.Core (>= 12.2.2)
+    Magick.NET.Core (12.2.2)
+    Microsoft.Win32.SystemEvents (7.0)
+    System.Drawing.Common (7.0)
+      Microsoft.Win32.SystemEvents (>= 7.0)
+    System.Text.Encodings.Web (7.0)
+    System.Text.Json (7.0.1)
+      System.Text.Encodings.Web (>= 7.0)
