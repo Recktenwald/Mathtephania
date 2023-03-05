@@ -128,19 +128,26 @@ module Path =
                 + toSvgPathString ps
             | ClosePath -> "Z" + toSvgPathString ps
 
-module PathParser = 
-    open FParsec 
+module PathParser =
+    open FParsec
 
     open Path
-    
-    type Pu<'T> = Parser<'T,unit>
-    // pMyFloat also succeeds on .5 
-    let pMyFloat : Pu<float> = 
-        numberLiteral (NumberLiteralOptions.DefaultFloat ||| NumberLiteralOptions.AllowFractionWOIntegerPart) "float" 
+
+    type Pu<'T> = Parser<'T, unit>
+    // pMyFloat also succeeds on .5
+    let pMyFloat: Pu<float> =
+        numberLiteral
+            (NumberLiteralOptions.DefaultFloat
+             ||| NumberLiteralOptions.AllowFractionWOIntegerPart)
+            "float"
         |>> fun nl -> (float nl.String)
+
     let withSpaces p = between spaces spaces p
-    let pPoint : Pu<_> = tuple2 (withSpaces pMyFloat) (withSpaces pMyFloat)
-    let pfloatS : Pu<_> = withSpaces pMyFloat
+
+    let pPoint: Pu<_> =
+        tuple2 (withSpaces pMyFloat) (withSpaces pMyFloat)
+
+    let pfloatS: Pu<_> = withSpaces pMyFloat
 
     // Now we define Parsers for all the Path elements
     // In essance we do the following
@@ -148,25 +155,35 @@ module PathParser =
     // // Depending on the letter check for the right amount of numbers after it
     // // Map each set of inputs, for the specific command, to the PathPart
     // MoveTo and MoveAlong are special because following commands are interpreted as LineTo and LineAlong
-    let pMoveTo :Pu<_> = 
-        let toPath (vecs : Point list) = 
-            match vecs with 
-            | x::xs -> [MoveTo x; yield! (List.map LineTo xs)]
-            | [] ->  failwith "At this point the parser should have failed"
-        pstring "M" >>. (many (withSpaces pPoint)) |>> toPath
-        
-    let pMoveAlong : Pu<_> = 
-        let toPath (vecs : Point list) =
-            match vecs with 
-            | x::xs -> [MoveAlong x; yield! (List.map LineAlong xs)]
+    let pMoveTo: Pu<_> =
+        let toPath (vecs: Point list) =
+            match vecs with
+            | x :: xs ->
+                [ MoveTo x
+                  yield! (List.map LineTo xs) ]
             | [] -> failwith "At this point the parser should have failed"
-        pstring "m" >>. (many (withSpaces pPoint)) |>> toPath
+
+        pstring "M" >>. (many (withSpaces pPoint))
+        |>> toPath
+
+    let pMoveAlong: Pu<_> =
+        let toPath (vecs: Point list) =
+            match vecs with
+            | x :: xs ->
+                [ MoveAlong x
+                  yield! (List.map LineAlong xs) ]
+            | [] -> failwith "At this point the parser should have failed"
+
+        pstring "m" >>. (many (withSpaces pPoint))
+        |>> toPath
 
     // This is a helper to create the others
     // The letter corresponds to the command, the parser parses it's inputs, we finally transform it into the PathPart
-    let pAll (letter:string) (parser:Pu<'a>) (pathPart : 'a -> PathPart) = 
-        let toPath (xs : 'a list) = List.map pathPart xs 
-        pstring letter >>. (many (withSpaces parser)) |>> toPath
+    let pAll (letter: string) (parser: Pu<'a>) (pathPart: 'a -> PathPart) =
+        let toPath (xs: 'a list) = List.map pathPart xs
+
+        pstring letter >>. (many (withSpaces parser))
+        |>> toPath
 
     let pLineTo = pAll "L" pPoint LineTo
     let pLineAlong = pAll "l" pPoint LineAlong
@@ -174,90 +191,114 @@ module PathParser =
     let pHorizontalAlong = pAll "h" pfloatS HorizontalAlong
     let pVerticalTo = pAll "V" pfloatS VerticalTo
     let pVerticalAlong = pAll "v" pfloatS VerticalAlong
-    let pCubicBezierAbsolute = pAll "C" (tuple3 pPoint pPoint pPoint) CubicBezierAbsolute
-    let pCubicBezierRelative = pAll "c" (tuple3 pPoint pPoint pPoint) CubicBezierRelative
-    let pSmoothCubicBezierAbsolute = pAll "S" (tuple2 pPoint pPoint) SmoothCubicBezierAbsolute
-    let pSmoothCubicBezierRelative = pAll "s" (tuple2 pPoint pPoint) SmoothCubicBezierRelative
-    let pQuadraticBezierAbsolute = pAll "Q" (tuple2 pPoint pPoint) QuadraticBezierAbsolute
-    let pQuadraticBezierRelative = pAll "q" (tuple2 pPoint pPoint) QuadraticBezierRelative
-    let pSmoothQuadraticBezierAbsolute = pAll "T" pPoint SmoothQuadraticBezierAbsolute
-    let pSmoothQuadraticBezierRelative = pAll "t" pPoint SmoothQuadraticBezierRelative
+
+    let pCubicBezierAbsolute =
+        pAll "C" (tuple3 pPoint pPoint pPoint) CubicBezierAbsolute
+
+    let pCubicBezierRelative =
+        pAll "c" (tuple3 pPoint pPoint pPoint) CubicBezierRelative
+
+    let pSmoothCubicBezierAbsolute =
+        pAll "S" (tuple2 pPoint pPoint) SmoothCubicBezierAbsolute
+
+    let pSmoothCubicBezierRelative =
+        pAll "s" (tuple2 pPoint pPoint) SmoothCubicBezierRelative
+
+    let pQuadraticBezierAbsolute =
+        pAll "Q" (tuple2 pPoint pPoint) QuadraticBezierAbsolute
+
+    let pQuadraticBezierRelative =
+        pAll "q" (tuple2 pPoint pPoint) QuadraticBezierRelative
+
+    let pSmoothQuadraticBezierAbsolute =
+        pAll "T" pPoint SmoothQuadraticBezierAbsolute
+
+    let pSmoothQuadraticBezierRelative =
+        pAll "t" pPoint SmoothQuadraticBezierRelative
 
     // Arc needs 6 Inputs but FParsec only goes up to tuple5 so we define our own
     let pipe6 p1 p2 p3 p4 p5 p6 g =
-        p1 >>= fun a ->
-        p2 >>= fun b ->
-        p3 >>= fun c ->
-        p4 >>= fun d ->
-        p5 >>= fun e -> 
-        p6 >>= fun f -> preturn (g a b c d e f)
+        p1
+        >>= fun a ->
+                p2
+                >>= fun b ->
+                        p3
+                        >>= fun c ->
+                                p4
+                                >>= fun d ->
+                                        p5
+                                        >>= fun e -> p6 >>= fun f -> preturn (g a b c d e f)
 
-    let tuple6 p1 p2 p3 p4 p5 p6= pipe6 p1 p2 p3 p4 p5 p6 (fun a b c d e f -> (a, b, c, d, e, f))
+    let tuple6 p1 p2 p3 p4 p5 p6 =
+        pipe6 p1 p2 p3 p4 p5 p6 (fun a b c d e f -> (a, b, c, d, e, f))
 
     // We need parsers for the flags
-    let pArcFlag : Pu<_> = 
-        withSpaces 
-            (pstring "0"|>> (fun _ -> Small)) 
-            <|> (pstring "1" |>> (fun _ -> Large))
+    let pArcFlag: Pu<_> =
+        withSpaces (pstring "0" |>> (fun _ -> Small))
+        <|> (pstring "1" |>> (fun _ -> Large))
 
-    let pSweepFlag : Pu<_> = 
-        withSpaces 
-            (pstring "0"|>> (fun _ -> CounterClockwise)) 
-            <|> (pstring "1" |>> (fun _ -> Clockwise))
+    let pSweepFlag: Pu<_> =
+        withSpaces (pstring "0" |>> (fun _ -> CounterClockwise))
+        <|> (pstring "1" |>> (fun _ -> Clockwise))
 
 
-    let pArcAbsolute : Pu<_> = pAll "A" (tuple6 pfloatS pfloatS pfloatS pArcFlag pSweepFlag pPoint) ArcAbsolute
-    let pArcRelative : Pu<_> = pAll "A" (tuple6 pfloatS pfloatS pfloatS pArcFlag pSweepFlag pPoint) ArcRelative
+    let pArcAbsolute: Pu<_> =
+        pAll "A" (tuple6 pfloatS pfloatS pfloatS pArcFlag pSweepFlag pPoint) ArcAbsolute
 
-    let pClose : Pu<_> = 
-        withSpaces (pstring "z" <|> pstring "Z") 
-        |>> (fun _ -> [ClosePath])
+    let pArcRelative: Pu<_> =
+        pAll "A" (tuple6 pfloatS pfloatS pfloatS pArcFlag pSweepFlag pPoint) ArcRelative
+
+    let pClose: Pu<_> =
+        withSpaces (pstring "z" <|> pstring "Z")
+        |>> (fun _ -> [ ClosePath ])
 
     // Now we can combine them to a parser for any of the path commands, and then just go through them one after another
-    let pPathPart = 
-        choice [
-            pMoveTo
-            pMoveAlong
-            pLineTo 
-            pLineAlong 
-            pHorizontalTo
-            pHorizontalAlong
-            pVerticalTo
-            pVerticalAlong 
-            pCubicBezierAbsolute 
-            pCubicBezierRelative 
-            pSmoothCubicBezierAbsolute 
-            pSmoothCubicBezierRelative 
-            pQuadraticBezierAbsolute 
-            pQuadraticBezierRelative 
-            pSmoothQuadraticBezierAbsolute 
-            pSmoothQuadraticBezierRelative
-            pArcAbsolute
-            pArcRelative
-            pClose 
-        ]
+    let pPathPart =
+        choice [ pMoveTo
+                 pMoveAlong
+                 pLineTo
+                 pLineAlong
+                 pHorizontalTo
+                 pHorizontalAlong
+                 pVerticalTo
+                 pVerticalAlong
+                 pCubicBezierAbsolute
+                 pCubicBezierRelative
+                 pSmoothCubicBezierAbsolute
+                 pSmoothCubicBezierRelative
+                 pQuadraticBezierAbsolute
+                 pQuadraticBezierRelative
+                 pSmoothQuadraticBezierAbsolute
+                 pSmoothQuadraticBezierRelative
+                 pArcAbsolute
+                 pArcRelative
+                 pClose ]
+
     let pPath = many pPathPart
 
-module LatexSvgParser = 
+module LatexSvgParser =
     // THIS IS NOT A FULL SVG PARSER!
     // IT MAKES A LOT OF ASSUMPTIONS ON THE SPECIFIC FILE
     open System
-    open System.Xml 
+    open System.Xml
 
     let nsManager = new XmlNamespaceManager(NameTable())
     nsManager.AddNamespace("svg", "http://www.w3.org/2000/svg")
 
-    let extractIdAndPath (attributes:XmlAttributeCollection) =
-        match attributes.ItemOf("id").Value, attributes.ItemOf("d").Value with 
-        | null, null -> None , None 
-        | x, null -> Some x, None 
+    let extractIdAndPath (attributes: XmlAttributeCollection) =
+        // Do I need more error handling here?
+        match attributes.ItemOf("id").Value, attributes.ItemOf("d").Value with
+        | null, null -> None, None
+        | x, null -> Some x, None
         | null, y -> None, Some y
-        | x, y -> Some x, Some y 
+        | x, y -> Some x, Some y
 
-    let getPathsInDefs (xml:XmlElement) = 
-        let nodes = xml.SelectNodes("svg:defs/svg:path", nsManager)
-        nodes |> Seq.cast<XmlNode> 
-        |> Seq.map (fun node -> node.Attributes) 
+    let getPathsInDefs (xml: XmlElement) =
+        let nodes =
+            xml.SelectNodes("svg:defs/svg:path", nsManager)
+
+        nodes
+        |> Seq.cast<XmlNode>
+        |> Seq.map (fun node -> node.Attributes)
         |> Seq.map (extractIdAndPath)
         |> Map.ofSeq
-
