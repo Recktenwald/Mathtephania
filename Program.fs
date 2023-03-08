@@ -1,9 +1,9 @@
-﻿let x = 1
+﻿open ImageMagick
+let img = new MagickImage(@"C:\AAPersonal\Programming\Mathtephania\Playground\test.svg")
 
-open Animo
-
-let v = Vec2 (1.0,0.0)
-
-
-// For more information see https://aka.ms/fsharp-console-apps
-printfn $"{v}Hello from F#"
+[<EntryPoint>]
+let main _ = 
+    img.Format <- MagickFormat.Png
+    img.Write(@"C:\AAPersonal\Programming\Mathtephania\Playground\test.png")
+    printfn "hello" 
+    0

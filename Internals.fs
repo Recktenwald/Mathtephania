@@ -3,21 +3,26 @@ namespace Renderer
 
 
 module Frame =
-    open ImageMagick
 
     type IRenderable =
-        abstract member Render : unit -> MagickImage
+        abstract member Render : unit -> System.Drawing.Bitmap
 
-    let toByteArray (img: IRenderable) = img.Render().ToByteArray()
+    let toByteArray (img: IRenderable) = img.Render()
 
 module FFmpeg =
     open System
+    open System.IO
     open System.Diagnostics
 
     type Animation =
-        { Frames: float -> Frame.IRenderable
+        { Frames: float -> Drawing.Bitmap
           Rate: int
           Duration: int } // in seconds
+    
+    let bmpToBytes (bmp: Drawing.Bitmap) = 
+        use stream = new MemoryStream()
+        bmp.Save(stream, Drawing.Imaging.ImageFormat.Png)
+        stream.ToArray()
 
     // I'm only implementing what I need / think I'll need
     // This is not supposed to be comprehensive
@@ -47,8 +52,8 @@ module FFmpeg =
           "-r " + args.Rate.ToString()
           "-i -"
           "-an"
-          "-vcoded libx264"
-          "-pix_fnt yuv420p"
+          "-vcodec libx264"
+          "-pix_fmt yuv420p"
           "-preset " + args.Preset.ToString().ToLower()
           "-crf " + args.Crf.ToString()
           if args.Faststart then
@@ -111,8 +116,7 @@ module FFmpeg =
             let t =
                 (float frameNumber / (float totalFrames))
 
-            let frame = frames t |> Frame.toByteArray
-
+            let frame = frames t |> bmpToBytes
             inStream.Write(frame)
             inStream.Flush() // Not entirely sure why I need this
 

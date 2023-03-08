@@ -124,50 +124,50 @@ module FFmpeg =
 
         cleanOut outputs, cleanOut errors
 
-module Svg =
-    open Animo
-    open ImageMagick
+// module Svg =
+//     open Curve
+//     open ImageMagick
 
-    type Viewbox =
-        { xmin: float
-          ymin: float
-          width: float
-          height: float }
-        override this.ToString() =
-            $"{this.xmin} {this.ymin} {this.width} {this.height}"
+    // type Viewbox =
+    //     { xmin: float
+    //       ymin: float
+    //       width: float
+    //       height: float }
+    //     override this.ToString() =
+    //         $"{this.xmin} {this.ymin} {this.width} {this.height}"
 
-    let toPathString (commands: BezierPath seq) =
-        let toPathCommand (command: BezierPath) =
-            match command with
-            | BezierPath.MoveTo (Vec2 (a, b)) -> $"M{a} {b}"
-            | BezierPath.CurveTo (Vec2 (a, b), Vec2 (c, d), Vec2 (e, f)) -> $"C{a} {b} {c} {d} {e} {f}"
-            | BezierPath.Close -> "Z"
+    // let toPathString (commands: BezierPath seq) =
+    //     let toPathCommand (command: BezierPath) =
+    //         match command with
+    //         | BezierPath.MoveTo (Vec2 (a, b)) -> $"M{a} {b}"
+    //         | BezierPath.CurveTo (Vec2 (a, b), Vec2 (c, d), Vec2 (e, f)) -> $"C{a} {b} {c} {d} {e} {f}"
+    //         | BezierPath.Close -> "Z"
 
-        Seq.map toPathCommand commands |> String.concat ""
+    //     Seq.map toPathCommand commands |> String.concat ""
 
-    let shapeToSvgElement shape =
-        $"""<path transform="scale(1 -1)" {shape.Attributes} d="{toPathString shape.Shape}"/>"""
+    // let shapeToSvgElement shape =
+    //     $"""<path transform="scale(1 -1)" {shape.Attributes} d="{toPathString shape.Shape}"/>"""
 
-    let intoSvgTag width height viewBox content =
-        $"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="{viewBox}">"""
-        + content
-        + "</svg>"
+    // let intoSvgTag width height viewBox content =
+    //     $"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="{viewBox}">"""
+    //     + content
+    //     + "</svg>"
 
-    let intoGroupTag attributes (transform: Transformation) content =
-        $"""<g transform="{transform}" {attributes}>"""
-        + content
-        + "</g>"
+    // let intoGroupTag attributes (transform: Transformation) content =
+    //     $"""<g transform="{transform}" {attributes}>"""
+    //     + content
+    //     + "</g>"
 
 
-    let shapeToSvg (shape: Shape) =
-        $"""<svg xmlns="http://www.w3.org/2000/svg" width="480px" height="270px" viewBox="-8 -4.5 16 9">
-            <path transform="scale(1 -1)" {shape.Attributes} d="{toPathString shape.Shape}"/>
-            </svg>
-        """
+    // let shapeToSvg (shape: Shape) =
+    //     $"""<svg xmlns="http://www.w3.org/2000/svg" width="480px" height="270px" viewBox="-8 -4.5 16 9">
+    //         <path transform="scale(1 -1)" {shape.Attributes} d="{toPathString shape.Shape}"/>
+    //         </svg>
+    //     """
 
-    let svgToQoiByteArray (svg: string) =
-        let image =
-            new MagickImage(System.Text.Encoding.ASCII.GetBytes(svg))
+    // let svgToQoiByteArray (svg: string) =
+    //     let image =
+    //         new MagickImage(System.Text.Encoding.ASCII.GetBytes(svg))
 
-        image.Format <- MagickFormat.Qoi
-        image.ToByteArray()
+    //     image.Format <- MagickFormat.Qoi
+    //     image.ToByteArray()

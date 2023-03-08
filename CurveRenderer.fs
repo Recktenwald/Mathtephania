@@ -1,135 +1,252 @@
 namespace Curve
 
+type ViewBox = 
+    {
+        MinX : float 
+        MinY : float 
+        Width : float 
+        Height : float 
+    }
+
+type Camera2D =
+    { 
+        visibleArea: ViewBox
+        // Position
+        x: float
+        y: float
+        z: float
+        outputHeight: float
+        outputWidth: float
+        background: Attributes.Paint 
+    }
+
+type Shape =
+    { Path: IPathable<Vec2>
+      Attributes: Attributes.DrawAttributes option
+      Transformation: Transformation } // not implemented yet
+
+type Scene =
+    { Shapes: Shape seq
+      Attributes: Attributes.DrawAttributes option
+      Camera: Camera2D }
+
 module SvgRenderer =
-    open Renderer
-    open ImageMagick
+    open System.Drawing
+    open Curve
+    open Curve.Attributes
+    open Svg
+    open Svg.Pathing
 
-    type Viewbox =
-        { xmin: float
-          ymin: float
-          width: float
-          height: float }
-        override this.ToString() =
-            $"{this.xmin} {this.ymin} {this.width} {this.height}"
-
+    type SvgDocument with 
+        static member draw (svgDoc:SvgDocument) =
+            svgDoc.Draw()
 
     type Camera2D =
-        { visibleArea: Viewbox
+        { visibleArea: SvgViewBox
           // Position
           x: float
           y: float
           z: float
           outputHeight: float
-          outputWidth: float }
+          outputWidth: float
+          background: Attributes.Paint }
 
-    let toPathString (pathable: IPathable<Vec2>) : string =
-        let path = pathable.ToPath()
 
-        let rec loop (currentPoint: Vec2 option) (CurvePath remainingPath) result =
+
+    let toSvgColor (paint: Paint) =
+        match paint with
+        | Paint.Transperant -> new SvgColourServer(Color.Transparent)
+        | Paint.RGB(a, b, c) -> new SvgColourServer(Color.FromArgb(a, b, c))
+        | _ -> failwith "not implemented"
+
+    type SvgElement with
+
+        member this.SetAttributes(a: DrawAttributes) =
+            if a.StrokeWidth.IsSome then
+                this.StrokeWidth <- SvgUnit(float32 a.StrokeWidth.Value)
+
+            if a.StrokeColor.IsSome then
+                this.Stroke <- toSvgColor a.StrokeColor.Value
+
+            if a.StrokeOpacity.IsSome then
+                this.StrokeOpacity <- float32 a.StrokeOpacity.Value
+
+            if a.StrokeLineCap.IsSome then
+                this.StrokeLineCap <-
+                    match a.StrokeLineCap.Value with
+                    | Cap.Butt -> SvgStrokeLineCap.Butt
+                    | Cap.Round -> SvgStrokeLineCap.Round
+                    | Cap.Square -> SvgStrokeLineCap.Square
+
+            if a.StrokeLineJoin.IsSome then
+                this.StrokeLineJoin <-
+                    match a.StrokeLineJoin.Value with
+                    | LineJoin.Bevel -> SvgStrokeLineJoin.Bevel
+                    | LineJoin.Miter -> SvgStrokeLineJoin.Miter
+                    | LineJoin.Round -> SvgStrokeLineJoin.Round
+
+            if a.StrokeMiterLimit.IsSome then
+                this.StrokeMiterLimit <- float32 a.StrokeMiterLimit.Value
+
+            if a.FillColor.IsSome then
+                this.Fill <- toSvgColor a.FillColor.Value
+
+            if a.FillOpacity.IsSome then
+                this.FillOpacity <- float32 a.FillOpacity.Value
+    // This takes care of flipping the y axis into the svg coordinate system
+    let inline vecToPoint (Vec2(a, b)) : PointF = new PointF(float32 a, float32 -b)
+
+    let toSvgPathSegments (pathable: IPathable<Vec2>) : SvgPathSegmentList =
+        let curvePath = pathable.ToPath()
+        // svgPath.PathData.Add(new SvgCubicCurveSegment(false, vecToPoint ))
+        let rec loop (currentPoint: Vec2 option) (CurvePath remainingPath) (result: SvgPathSegmentList) =
             match remainingPath with
             | [] -> result
             | p :: ps ->
                 match p with
-                | Close -> loop currentPoint (CurvePath ps) (result + " Z")
-                | Curve { StartPoint = Vec2 (a, b)
-                          StartControlPoint = Vec2 (c, d)
-                          EndControlPoint = Vec2 (e, f)
-                          EndPoint = Vec2 (g, h) } ->
-                    let newResult =
-                        if Some(Vec2(a, b)) <> currentPoint then
-                            result + $" M{a} {b} C{c} {d} {e} {f} {g} {h}"
-                        else
-                            result + $" C{c} {d} {e} {f} {g} {h}"
+                | Close -> //result.PathData.Add(new SvgClosePathSegment())
+                    result.Add(new SvgClosePathSegment(false))
+                    loop currentPoint (CurvePath ps) result
+                | Curve c ->
+                    if Some(c.StartPoint) <> currentPoint then
+                        result.Add(new SvgMoveToSegment(false, vecToPoint c.StartPoint))
+                    else
+                        ()
 
-                    loop (Some(Vec2(g, h))) (CurvePath ps) newResult
+                    result.Add(
+                        new SvgCubicCurveSegment(
+                            false,
+                            vecToPoint c.StartControlPoint,
+                            vecToPoint c.EndControlPoint,
+                            vecToPoint c.EndPoint
+                        )
+                    )
 
-        loop None path ""
+                    loop (Some c.EndPoint) (CurvePath ps) result
 
-    let intoPathTag attributes content =
-        match attributes with
-        | None -> $"""<path d="{content}"/>"""
-        | Some attributes -> $"""<path {attributes} d="{content}"/>"""
+        loop None curvePath (new SvgPathSegmentList())
 
-    let intoGroupTag attributes content =
-        match attributes with
-        | None -> $"""<g>""" + content + "</g>"
-        | Some attributes -> $"""<g {attributes}>""" + content + "</g>"
+    type Shape with
+        static member toSvgElement shape =
+            let svgPath = toSvgPathSegments shape.Path
 
-    let intoSvgTag width height viewBox content =
-        $"""<svg xmlns="http://www.w3.org/2000/svg" transform="scale(1 -1)" width="{width}" height="{height}" viewBox="{viewBox}">"""
-        + content
-        + "</svg>"
+            let attr = shape.Attributes
+            let element = new SvgPath()
+            element.PathData <- svgPath
 
-    let intoSvgTagWithPos xpos ypos width height viewBox content =
-        $"""<svg xmlns="http://www.w3.org/2000/svg" transform="scale(1 -1)" x="{xpos}" y="{ypos}" width="{width}" height="{height}" viewBox="{viewBox}">"""
-        + content
-        + "</svg>"
+            match attr with
+            | None -> ()
+            | Some a -> element.SetAttributes(a)
 
-    type Shape =
-        { Path: IPathable<Vec2>
-          Attributes: Attributes.DrawAttributes option
-          Transformation: Transformation } // not implemented yet
-        static member shapeToSvgElement shape =
-            intoPathTag shape.Attributes (toPathString shape.Path)
+            element
 
         static member toSvg width height viewBox shape =
-            shape
-            |> Shape.shapeToSvgElement
-            |> intoSvgTag width height viewBox
+            let pathElement = Shape.toSvgElement shape
+            let svgDoc = new SvgDocument(ViewBox = viewBox, Width = width, Height = height)
+            svgDoc.Children.Add(pathElement)
+            svgDoc
+
+        static member toSvgString width height viewBox shape =
+            let svgDoc = Shape.toSvg width height viewBox shape
+            svgDoc.GetXML()
 
 
-    let svgToQoi (svg: string) =
-        let image =
-            new MagickImage(System.Text.Encoding.ASCII.GetBytes(svg))
 
-        image.Format <- MagickFormat.Qoi
-        image
 
-    type Scene =
-        { Shapes: Shape seq
-          Attributes: Attributes.DrawAttributes option
-          Camera: Camera2D
-          Children: ChildScene list } // not implemented yet
+
+
+    let toSvgViewbox (vb:ViewBox) = 
+        new SvgViewBox(
+            MinX = float32 vb.MinX,
+            MinY = float32 vb.MinY,
+            Height = float32 vb.Height,
+            Width = float32 vb.Width
+        )
+
+    type Scene with 
         static member toSvg scene =
             let camera = scene.Camera
-
+            let visibleArea = toSvgViewbox camera.visibleArea
             let parentContent =
-                scene.Shapes
-                |> Seq.map Shape.shapeToSvgElement
-                |> String.concat "\n"
-                |> intoGroupTag scene.Attributes
+                new SvgDocument(
+                    ViewBox = visibleArea,
+                    Width = SvgUnit(float32 camera.outputWidth),
+                    Height = SvgUnit(float32 camera.outputHeight)
+                )
 
-            let childrenContent =
-                match scene.Children with
-                | [] -> ""
-                | _ -> // This match is actually unnecessary but I find it clearer
-                    scene.Children
-                    |> List.map ChildScene.toSvg
-                    |> String.concat "\n"
+            match camera.background with
+            | Paint.Transperant -> ()
+            | RGB _ ->
+                parentContent.Children.Add(
+                    new SvgRectangle(
+                        Width = SvgUnit(SvgUnitType.Percentage, 100f),
+                        Height = SvgUnit(SvgUnitType.Percentage, 100f),
+                        X = visibleArea.MinX,
+                        Y = visibleArea.MinY,
+                        Fill = toSvgColor (camera.background),
+                        Stroke = toSvgColor (Paint.Transperant)
+                    )
+                )
+            | _ -> failwith "Not implemented yet"
 
-            parentContent + "\n" + childrenContent
-            |> intoSvgTag camera.outputWidth camera.outputHeight camera.visibleArea
+            if scene.Attributes.IsSome then
+                parentContent.SetAttributes(scene.Attributes.Value)
 
-        interface Frame.IRenderable with
-            member this.Render() =
-                let svg = Scene.toSvg this
+            for shape in scene.Shapes do
+                parentContent.Children.Add(Shape.toSvgElement shape)
 
-                svgToQoi svg
+            parentContent
 
-    and ChildScene =
-        { xpos: float
-          ypos: float
-          width: float
-          height: float
-          Scene: Scene }
-        static member toSvg child =
-            let visibleArea = child.Scene.Camera.visibleArea
+        static member toSvgString scene =
+            let svgDoc = Scene.toSvg scene
+            svgDoc.GetXML()
 
-            child.Scene.Shapes
-            |> Seq.map Shape.shapeToSvgElement
-            |> String.concat "\n"
-            |> intoGroupTag child.Scene.Attributes
-            |> intoSvgTagWithPos child.xpos child.ypos child.width child.height visibleArea
+    
+// let childrenContent = new SvgGroup()
+// for child in scene.Children do
+//     childrenContent.Children.Add(Shape.toSvgElement)
+//     // match scene.Children with
+//     // | [] -> ""
+//     // | _ -> // This match is actually unnecessary but I find it clearer
+//     //     scene.Children
+//     //     |> List.map ChildScene.toSvg
+//     //     |> String.concat "\n"
+
+
+// let backgroundRect =
+//     match camera.background with
+//     | Attributes.Paint.Transperant -> ""
+//     | Attributes.Paint.RGB (a,b,c) ->
+//         let xpos = camera.visibleArea.MinX
+//         let ypos = camera.visibleArea.MinY
+//         let color = camera.background.ToString()
+//         let hundretPercent = "100%"
+//         $"<rect x=\"{xpos}\" y=\"{ypos}\" width=\"{hundretPercent}\" height=\"{hundretPercent}\" fill=\"{color}\"/>"
+//     | _ -> failwith "not implemented yet"
+
+// backgroundRect + "\n" + parentContent + "\n" + childrenContent
+// |> intoSvgTag camera.outputWidth camera.outputHeight camera.visibleArea
+
+// interface Frame.IRenderable with
+//     member this.Render() =
+//         let svg = Scene.toSvg this
+
+//         svgToQoi svg
+
+// and ChildScene =
+//     { xpos: float
+//       ypos: float
+//       width: float
+//       height: float
+//       Scene: Scene }
+//     static member toSvg child =
+//         let visibleArea = child.Scene.Camera.visibleArea
+
+//         child.Scene.Shapes
+//         |> Seq.map Shape.shapeToSvgElement
+//         |> String.concat "\n"
+//         |> intoGroupTag child.Scene.Attributes
+//         |> intoSvgTagWithPos child.xpos child.ypos child.width child.height visibleArea
 //     static member toSvg child =
 //         match child.Scene with
 //         | Scene s ->

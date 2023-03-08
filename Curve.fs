@@ -161,23 +161,25 @@ module Attributes =
             | Round -> "round"
 
     type Paint =
+        | Transperant // Note that having fill=none is different to not having a fill attribute at all!
         | RGB of int * int * int // https://www.w3.org/TR/2003/REC-SVG11-20030114/types.html#ColorKeywords to make a lot of constants.
         | LinearGradient // not implemented yet
         | RadialGradient // not implemented yet
         override this.ToString() =
             match this with
+            | Transperant -> "none"
             | RGB (a, b, c) -> $"rgb({a},{b},{c})"
             | _ -> failwith "not implemented yet"
 
     type DrawAttributes =
-        { StrokeWidth: float
+        { StrokeWidth: float option
           StrokeColor: Paint option
-          StrokeOpacity: float
-          StrokeLineCap: Cap
-          StrokeLineJoin: LineJoin
+          StrokeOpacity: float option 
+          StrokeLineCap: Cap option 
+          StrokeLineJoin: LineJoin option 
           StrokeMiterLimit: float option
-          FillColor: Paint option
-          FillOpacity: float }
+          FillColor: Paint option 
+          FillOpacity: float option }
         //   override this.ToString() =
         //     $"stroke-width=\"{this.StrokeWidth}\""
         //     + match this.StrokeColor with | None -> "" | Some paint -> $"stroke=\"{paint}\""
@@ -188,30 +190,28 @@ module Attributes =
         //     + match this.FillColor with | None -> "" | Some paint -> $"fill=\"{paint}\""
         //     + $"fill-opacity=\"{this.FillOpacity}\""
         override this.ToString() =
-            [ $"stroke-width=\"{this.StrokeWidth}\""
-              match this.StrokeColor with
-              | None -> ""
-              | Some paint -> $"stroke=\"{paint}\""
-              $"stroke-opacity=\"{this.StrokeOpacity}\""
-              $"stroke-linecap=\"{this.StrokeLineCap}\""
-              $"stroke-linejoin=\"{this.StrokeLineJoin}\""
-              match this.StrokeMiterLimit with
-              | None -> ""
-              | Some limit -> $"stroke-miterlimit=\"{limit}\""
-              match this.FillColor with
-              | None -> "fill=\"none\""
-              | Some paint -> $"fill=\"{paint}\""
-              $"fill-opacity=\"{this.FillOpacity}\"" ]
-            |> String.concat " "
+            let toName attribute name = 
+                match attribute with 
+                | Some value -> $"{name}=\"{value}\""
+                | None -> ""
+            [ 
+                toName this.StrokeWidth "stroke-width"
+                toName this.StrokeColor "stroke"
+                toName this.StrokeOpacity "stroke-opacity"
+                toName this.StrokeLineCap "stroke-linecap"
+                toName this.StrokeLineJoin "stroke-linejoin"
+                toName this.FillColor "fill" 
+                toName this.FillOpacity "fill-opacity" 
+            ] |> String.concat " "
 
 
     let defaultDrawAttributes =
         { // This assumes a default resolution of roughly 1600x900
-          StrokeWidth = 0.05
+          StrokeWidth = Some 0.05
           StrokeColor = None
-          StrokeOpacity = 1.0
-          StrokeLineCap = Cap.Butt
-          StrokeLineJoin = LineJoin.Miter
+          StrokeOpacity = Some 1.0
+          StrokeLineCap = Some Cap.Butt
+          StrokeLineJoin = Some LineJoin.Miter
           StrokeMiterLimit = Some 4.0
           FillColor = Some(RGB(0, 0, 0))
-          FillOpacity = 1.0 }
+          FillOpacity = Some 1.0 }
