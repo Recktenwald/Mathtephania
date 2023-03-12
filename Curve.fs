@@ -12,10 +12,10 @@ type Vec2 =
     static member inline (~-)(Vec2 (a, b)) = Vec2(-a, -b)
 
     // Multiplicative Structure
-    static member inline (.*)(Vec2 (a, b), lambda) = Vec2(a * lambda, b * lambda)
-    static member inline (.*)(lambda, v) = v * lambda
-    static member inline (/)(Vec2 (a, b), lambda) = Vec2(a / lambda, b / lambda)
-    static member inline (/)(lambda, Vec2 (a, b)) = Vec2(lambda / a, lambda / b)
+    static member inline (.*)(Vec2 (a, b), lambda:float):Vec2 = Vec2(a * lambda, b * lambda)
+    static member inline (.*)(lambda:float , v:Vec2):Vec2 = v .* lambda
+    static member inline (/)(Vec2 (a, b), lambda:float):Vec2 = Vec2(a / lambda, b / lambda)
+    static member inline (/)(lambda:float, Vec2 (a, b)):Vec2 = Vec2(lambda / a, lambda / b)
 
     // Convenience Functions
     member this.Item
@@ -30,8 +30,11 @@ type Vec2 =
         match this with
         | Vec2 (a, b) -> $"{a} {b}"
 
-// // Euclidiean structure
-// static member inline ( .* )(Vec2 (a, b), Vec2 (x, y)) = a*x + b*y
+    // Euclidiean structure
+    member this.Abs() = 
+        match this with 
+        | Vec2 (a, b) -> sqrt(a*a + b*b)
+    member this.Turn() = match this with Vec2(a,b) -> Vec2(-b, a)
 
 module Vec2 =
     let inline map f (Vec2 (a, b)) = Vec2(f a, f b)
@@ -46,6 +49,33 @@ module Vec2 =
         | 1 -> Vec2(a, value)
         | _ -> failwith "Vec2: Index out of bounds."
 
+[<Struct>]
+type Mat2 = // Row Vectors
+    | Mat2 of Vec2 * Vec2 
+    // Additive Structure
+    static member inline Zero = Mat2 (Vec2.Zero, Vec2.Zero)
+    static member inline (+)(Mat2 (a, b), Mat2 (x, y)) = Mat2(a+x, b+y)
+    static member inline (-)(Mat2 (a, b), Mat2 (x, y)) = Mat2(a-x, b-y)
+    static member inline (~-)(Mat2 (a, b)) = Mat2(-a, -b)
+
+    // Multiplicative Structure
+    static member inline (.*)(Mat2 (a, b), lambda:float) = Mat2(a .* lambda, b .* lambda)
+    static member inline (.*)(lambda:float, m:Mat2) = m .* lambda
+    static member inline (.*)(Mat2 (v,w), x:Vec2) = Vec2( Vec2.dot v x, Vec2.dot w x)
+    static member inline (/)(Mat2 (a, b), lambda) = Mat2(a / lambda, b / lambda)
+    static member inline (/)(lambda, Mat2 (a, b)) = Mat2(lambda / a, lambda / b)
+    
+    // Convenience Functions
+    member this.Item
+        with get (n) =
+            match this, n with
+            | Mat2 (a, b), 0 -> a
+            | Mat2 (a, b), 1 -> b
+            | _ -> failwith "Vec2: Index out of bounds."
+        
+    override this.ToString() =
+        match this with
+        | Mat2 (Vec2(a, b), Vec2(x,y)) -> $"{a} {x}\n{b} {y}"
 
 // type Vec3 =
 //     | Vec3 of float * float * float
@@ -60,6 +90,13 @@ type Curve<'T> =
       StartControlPoint: 'T
       EndControlPoint: 'T
       EndPoint: 'T }
+    static member inline (.*)(m:Mat2, c:Curve<Vec2>) = 
+        {
+            StartPoint = m .* c.StartPoint
+            StartControlPoint = m .* c.StartControlPoint
+            EndControlPoint = m .* c.EndControlPoint
+            EndPoint = m .* c.EndPoint
+        }
 
 type Interpolation<'T> = 'T -> 'T -> float -> 'T
 

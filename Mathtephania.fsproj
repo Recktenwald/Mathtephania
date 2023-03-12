@@ -10,6 +10,7 @@
     <Compile Include="CurveRenderer.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="Render.fs" />
+    <Compile Include="Geometry.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <Import Project=".paket\Paket.Restore.targets" />
